@@ -52,6 +52,7 @@ type Pool struct {
 	context C.rados_ioctx_t
 }
 
+// OpenPool opens a pool for query, read, and write operations.
 func (cluster *Cluster) OpenPool(poolName string) (*Pool, error) {
 	p := C.CString(poolName)
 	defer C.free(unsafe.Pointer(p))
@@ -64,15 +65,29 @@ func (cluster *Cluster) OpenPool(poolName string) (*Pool, error) {
 	return &Pool{ioContext}, nil
 }
 
-// Close this pool context when all asynchronous writes are done.
+// CloseWhenDone this pool context when all asynchronous writes are done.
 func (pool *Pool) CloseWhenDone() {
 	C.rados_aio_flush(pool.context)
 	pool.CloseNow()
 }
 
-// Close this pool context immediately.
+// CloseNow this pool context immediately.
 func (pool *Pool) CloseNow() {
 	C.rados_ioctx_destroy(pool.context)
+}
+
+// Config returns a reference of the ClusterConfig.
+func (pool *Pool) Config() *ClusterConfig {
+	config := new(ClusterConfig)
+	config.context = C.rados_ioctx_cct(pool.context)
+	return config
+}
+
+// Cluster returns a reference of the Cluster handle.
+func (pool *Pool) Cluster() *Cluster {
+	cluster := new(Cluster)
+	cluster.handle = C.rados_ioctx_get_cluster(pool.context)
+	return cluster
 }
 
 // Status retrieves the PoolStatus.
@@ -141,28 +156,53 @@ func (pool *Pool) Name() string {
 	}
 }
 
-// SetLocatorKey sets the key for mapping objects to pgs.
-//
-// The key is used instead of the object name to determine which placement groups an object is put in. This affects all
-// subsequent operations of the io context - until a different locator key is set, all objects in this io context will
-// be placed in the same pg.
-//
-// This is useful if you need to do clone_range operations, which must be done with the source and destination objects
-// in the same pg.
-func (pool *Pool) SetLocatorKey(key string) {
-	k := C.CString(key)
-	defer C.free(unsafe.Pointer(k))
-	C.rados_ioctx_locator_set_key(pool.context, k)
+// RequiresAlignment returns true if the pool requires alignment.
+func (pool *Pool) RequiresAlignment() bool {
+	ret := C.rados_ioctx_pool_requires_alignment(pool.context)
+	return ret != 0
 }
 
-// Set the namespace for objects.
-//
-// The namespace specification further refines a pool into different domains. The mapping of objects to pgs is also
-// based on this value.
-func (pool *Pool) SetNamespace(namespace string) {
-	n := C.CString(namespace)
-	defer C.free(unsafe.Pointer(n))
-	C.rados_ioctx_set_namespace(pool.context, n)
+// TODO:
+func (pool *Pool) RequiredAlignment() uint64 {
+	return uint64(C.rados_ioctx_pool_required_alignment(pool.context))
+}
+
+// CreateSnapshot creates a pool wide snapshot.
+func (pool *Pool) CreateSnapshot(snapshotName string) error {
+	name := C.CString(snapshotName)
+	defer C.free(unsafe.Pointer(name))
+	ret := C.rados_ioctx_snap_create(pool.context, name)
+	if err := toRadosError(ret); err != nil {
+		err.Message = fmt.Sprintf("Unable to create snapshot %s", snapshotName)
+		return err
+	}
+	return nil
+}
+
+// RemoveSnapshot removes a pool wide snapshot.
+func (pool *Pool) RemoveSnapshot(snapshotName string) error {
+	name := C.CString(snapshotName)
+	defer C.free(unsafe.Pointer(name))
+	ret := C.rados_ioctx_snap_remove(pool.context, name)
+	if err := toRadosError(ret); err != nil {
+		err.Message = fmt.Sprintf("Unable to remove snapshot %s", snapshotName)
+		return err
+	}
+	return nil
+}
+
+// RollbackSnapshot rolls back an object to a pool snapshot.
+func (pool *Pool) RollbackSnapshot(objectName, snapshotName string) error {
+	object := C.CString(objectName)
+	snapshot := C.CString(snapshotName)
+	defer C.free(unsafe.Pointer(object))
+	defer C.free(unsafe.Pointer(snapshot))
+	ret := C.rados_ioctx_snap_rollback(pool.context, object, snapshot)
+	if err := toRadosError(ret); err != nil {
+		err.Message = fmt.Sprintf("Unable to rollback object %s to snapshot %s", objectName, snapshotName)
+		return err
+	}
+	return nil
 }
 
 // ListPools returns all the pools in the ceph cluster.

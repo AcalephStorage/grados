@@ -161,7 +161,7 @@ func (conn *Connection) Connect() (*Cluster, error) {
 
 	ret := C.rados_connect(conn.cluster.handle)
 	if err := toRadosError(ret); err != nil {
-		err.Message = "Unable to connect to cluster. Make sure cluster is accessible and configuration is correct."
+		err.Message = fmt.Sprintf("Unable to connect to cluster. Make sure cluster is accessible and configuration is correct. %v", conn)
 		return nil, err
 	}
 	return conn.cluster, nil
@@ -260,7 +260,7 @@ func (conn *Connection) configure() error {
 		}
 	}
 
-	if conn.ConfigMap != nil {
+	if conn.ConfigMap != nil || len(conn.ConfigMap) > 0 {
 		for k, v := range conn.ConfigMap {
 			key := C.CString(k)
 			val := C.CString(v)

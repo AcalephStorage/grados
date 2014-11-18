@@ -2,6 +2,54 @@ package grados
 
 import "testing"
 
+func TestGetConfigReference(t *testing.T) {
+	cluster := connect(t)
+	if cluster == nil {
+		return
+	}
+	pool, err := cluster.OpenPool("data")
+	handleError(t, err)
+	config := pool.Config()
+	t.Log("config context:", config.context)
+}
+
+func TestGetClusterReference(t *testing.T) {
+	cluster := connect(t)
+	if cluster == nil {
+		return
+	}
+	pool, err := cluster.OpenPool("data")
+	handleError(t, err)
+	c := pool.Cluster()
+	fsid := c.FSID()
+	t.Log("FSID:", fsid)
+	if cluster.handle != c.handle {
+		t.Errorf("handles not the same: %v, %v", cluster.handle, c.handle)
+	}
+}
+
+func TestRequiresAlignment(t *testing.T) {
+	cluster := connect(t)
+	if cluster == nil {
+		return
+	}
+	pool, err := cluster.OpenPool("data")
+	handleError(t, err)
+	alignment := pool.RequiresAlignment()
+	t.Log("RequiresAlignment:", alignment)
+}
+
+func TestRequiredAlignemnt(t *testing.T) {
+	cluster := connect(t)
+	if cluster == nil {
+		return
+	}
+	pool, err := cluster.OpenPool("data")
+	handleError(t, err)
+	alignment := pool.RequiredAlignment()
+	t.Log("RequiredAlignment:", alignment)
+}
+
 func TestListPools(t *testing.T) {
 	cluster := connect(t)
 	if cluster == nil {
