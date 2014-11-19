@@ -167,44 +167,6 @@ func (pool *Pool) RequiredAlignment() uint64 {
 	return uint64(C.rados_ioctx_pool_required_alignment(pool.context))
 }
 
-// CreateSnapshot creates a pool wide snapshot.
-func (pool *Pool) CreateSnapshot(snapshotName string) error {
-	name := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(name))
-	ret := C.rados_ioctx_snap_create(pool.context, name)
-	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to create snapshot %s", snapshotName)
-		return err
-	}
-	return nil
-}
-
-// RemoveSnapshot removes a pool wide snapshot.
-func (pool *Pool) RemoveSnapshot(snapshotName string) error {
-	name := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(name))
-	ret := C.rados_ioctx_snap_remove(pool.context, name)
-	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to remove snapshot %s", snapshotName)
-		return err
-	}
-	return nil
-}
-
-// RollbackSnapshot rolls back an object to a pool snapshot.
-func (pool *Pool) RollbackSnapshot(objectName, snapshotName string) error {
-	object := C.CString(objectName)
-	snapshot := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(object))
-	defer C.free(unsafe.Pointer(snapshot))
-	ret := C.rados_ioctx_snap_rollback(pool.context, object, snapshot)
-	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to rollback object %s to snapshot %s", objectName, snapshotName)
-		return err
-	}
-	return nil
-}
-
 // ListPools returns all the pools in the ceph cluster.
 func (cluster *Cluster) ListPools() ([]string, error) {
 	buf := make([]byte, 4096)

@@ -52,13 +52,6 @@ func (pool *Pool) WriteToObject(objectId string, data []byte, offset uint64) err
 		err.Message = fmt.Sprintf("Unable to write data to object %s", objectId)
 		return err
 	}
-	if int(ret) != len(data) {
-		err := &RadosError{
-			Code:    int(ret),
-			Message: fmt.Sprintf("Returned length is not equal to specified length: %d, %d", len(data), ret),
-		}
-		return err
-	}
 	return nil
 }
 
