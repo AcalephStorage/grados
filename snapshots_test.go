@@ -1,6 +1,7 @@
 package grados
 
 import "testing"
+import "bytes"
 
 func TestPoolSnapshot(t *testing.T) {
 	cluster := connect(t)
@@ -13,11 +14,13 @@ func TestPoolSnapshot(t *testing.T) {
 		return
 	}
 
-	pool.WriteFullToObject("test", []byte("Hello World"))
+	bytes.NewBufferString("Hello World")
+
+	pool.WriteFullToObject("test", bytes.NewBufferString("Hello World"))
 	err = pool.CreatePoolSnapshot("my_snapshot")
 	handleError(t, err)
 
-	err = pool.WriteFullToObject("test", []byte("Hello Mars"))
+	err = pool.WriteFullToObject("test", bytes.NewBufferString("Hello Mars"))
 	handleError(t, err)
 
 	err = pool.RollbackToPoolSnapshot("test", "my_snapshot")
@@ -25,7 +28,9 @@ func TestPoolSnapshot(t *testing.T) {
 
 	rolledback, err := pool.ReadFromObject("test", 11, 0)
 	handleError(t, err)
-	t.Log("RolledBack:", string(rolledback))
+	result := new(bytes.Buffer)
+	result.ReadFrom(rolledback)
+	t.Log("RolledBack:", result.String())
 
 	snapshots := pool.ListPoolSnapshots()
 	t.Log("snapshots:", len(snapshots))
@@ -73,13 +78,13 @@ func TestUseSnapshot(t *testing.T) {
 	handleError(t, err)
 	defer pool.CloseNow()
 
-	err = pool.WriteToObject("my_object", []byte("data1"), 0)
+	err = pool.WriteToObject("my_object", bytes.NewBufferString("data1"), 0)
 	handleError(t, err)
 
 	err = pool.CreatePoolSnapshot("snap1")
 	handleError(t, err)
 
-	err = pool.WriteToObject("my_object", []byte("data2"), 0)
+	err = pool.WriteToObject("my_object", bytes.NewBufferString("data2"), 0)
 	handleError(t, err)
 
 	id, err := pool.LookupPoolSnapshot("snap1")
@@ -90,8 +95,10 @@ func TestUseSnapshot(t *testing.T) {
 	data, err := pool.ReadFromObject("my_object", 5, 0)
 	handleError(t, err)
 
-	result := string(data)
-	if "data1" != result {
+	result := new(bytes.Buffer)
+	result.ReadFrom(data)
+
+	if "data1" != result.String() {
 		t.Errorf("result should be data1, result is %s", result)
 	}
 }
@@ -124,7 +131,7 @@ func TestSelfManagedPool(t *testing.T) {
 	handleError(t, err)
 	t.Log("snapshot context set to read")
 
-	err = pool.WriteFullToObject("sample", []byte("This is a test"))
+	err = pool.WriteFullToObject("sample", bytes.NewBufferString("This is a test"))
 	handleError(t, err)
 	t.Log("full object written")
 

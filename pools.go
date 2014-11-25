@@ -198,7 +198,7 @@ func (cluster *Cluster) ListPools() ([]string, error) {
 }
 
 // LookupPool returns the pool ID of the given pool name.
-func (cluster *Cluster) LookupPool(poolName string) (int, error) {
+func (cluster *Cluster) LookupPool(poolName string) (int64, error) {
 	p := C.CString(poolName)
 	defer C.free(unsafe.Pointer(p))
 	poolId := C.rados_pool_lookup(cluster.handle, p)
@@ -206,11 +206,11 @@ func (cluster *Cluster) LookupPool(poolName string) (int, error) {
 		err.Message = fmt.Sprintf("Unable to lookup pool ID for %s.", poolName)
 		return -1, err
 	}
-	return int(poolId), nil
+	return int64(poolId), nil
 }
 
 // ReverseLookupPool returns the pool name of the given pool ID.
-func (cluster *Cluster) ReverseLookupPool(id int) (string, error) {
+func (cluster *Cluster) ReverseLookupPool(id int64) (string, error) {
 	buf := make([]byte, 64)
 	for {
 		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))

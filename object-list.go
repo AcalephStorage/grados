@@ -38,8 +38,8 @@ func (objectList *ObjectList) Seek(position uint32) uint32 {
 	return uint32(ret)
 }
 
-// Next returns the entry (name of the object), key (location key if any) of the next object.
-func (objectList *ObjectList) Next() (entry, key string, err error) {
+// Next returns the objectId and locationKey (if any) of the next object.
+func (objectList *ObjectList) Next() (objectId, locationKey string, err error) {
 	var e *C.char
 	var k *C.char
 	ret := C.rados_objects_list_next(objectList.context, &e, &k)
@@ -47,8 +47,8 @@ func (objectList *ObjectList) Next() (entry, key string, err error) {
 		errs.Message = "Unable to get next object from list."
 		err = errs
 	} else {
-		entry = C.GoString(e)
-		key = C.GoString(k)
+		objectId = C.GoString(e)
+		locationKey = C.GoString(k)
 	}
 	return
 }
