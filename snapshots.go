@@ -11,6 +11,7 @@ import "C"
 import (
 	"fmt"
 	"sort"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -107,7 +108,7 @@ func (pool *Pool) ListPoolSnapshots() []SnapshotId {
 			addr = (*C.rados_snap_t)(&snaps[0])
 		}
 		ret := C.rados_ioctx_snap_list(pool.context, addr, C.int(len(snaps)))
-		if ret == errorRange {
+		if int(ret) == -int(syscall.ERANGE) {
 			snaps = make([]SnapshotId, C.int(len(snaps))+1)
 			continue
 		}
@@ -173,7 +174,7 @@ func (pool *Pool) ReverseLookupSnapshot(snapId SnapshotId) (string, error) {
 	for {
 		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
 		ret := C.rados_ioctx_snap_get_name(pool.context, id, bufAddr, C.int(len(buf)))
-		if ret == errorRange {
+		if int(ret) == -int(syscall.ERANGE) {
 			buf = make([]byte, len(buf)*2)
 			continue
 		}

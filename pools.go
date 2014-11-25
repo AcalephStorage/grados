@@ -10,6 +10,7 @@ import "C"
 import (
 	"bytes"
 	"fmt"
+	"syscall"
 	"unsafe"
 )
 
@@ -148,7 +149,7 @@ func (pool *Pool) Name() string {
 	for {
 		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
 		ret := C.rados_ioctx_get_pool_name(pool.context, bufAddr, C.unsigned(len(buf)))
-		if ret == errorRange {
+		if int(ret) == -int(syscall.ERANGE) {
 			buf = make([]byte, len(buf)*2)
 			continue
 		}
@@ -215,7 +216,7 @@ func (cluster *Cluster) ReverseLookupPool(id int64) (string, error) {
 	for {
 		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
 		ret := C.rados_pool_reverse_lookup(cluster.handle, C.int64_t(id), bufAddr, C.size_t(len(buf)))
-		if ret == errorRange {
+		if int(ret) == -int(syscall.ERANGE) {
 			buf = make([]byte, len(buf)*2)
 			continue
 		} else if ret < 0 {

@@ -10,6 +10,7 @@ import "C"
 
 import (
 	"fmt"
+	"syscall"
 	"unsafe"
 )
 
@@ -54,7 +55,7 @@ func (cluster *Cluster) FSID() string {
 	for {
 		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
 		ret := C.rados_cluster_fsid(cluster.handle, bufAddr, C.size_t(len(buf)))
-		if ret == errorRange {
+		if int(ret) == -int(syscall.ERANGE) {
 			buf = make([]byte, len(buf)*2)
 			continue
 		}
@@ -77,7 +78,7 @@ func (cluster *Cluster) GetConfigValue(configName string) (string, error) {
 	for {
 		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
 		ret := C.rados_conf_get(cluster.handle, cn, bufAddr, C.size_t(len(buf)))
-		if ret == errorNameTooLong {
+		if int(ret) == -int(syscall.ENAMETOOLONG) {
 			fmt.Println("TOO LONG: ", ret)
 			buf = make([]byte, len(buf)*2)
 			continue

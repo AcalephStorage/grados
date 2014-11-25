@@ -14,11 +14,6 @@ import (
 	"unsafe"
 )
 
-const (
-	errorRange             = -34
-	errorNameTooLong C.int = -36
-)
-
 // RadosError contains the error code returned from call the librados functions. The message is some (maybe) helpful
 // text regarding the error.
 type RadosError struct {
