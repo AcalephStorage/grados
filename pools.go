@@ -2,7 +2,6 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
@@ -11,7 +10,6 @@ import (
 	"bytes"
 	"fmt"
 	"syscall"
-	"unsafe"
 )
 
 // PoolStatus represents the status of an induividual pool.
@@ -56,7 +54,7 @@ type Pool struct {
 // OpenPool opens a pool for query, read, and write operations.
 func (cluster *Cluster) OpenPool(poolName string) (*Pool, error) {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	var ioContext C.rados_ioctx_t
 	ret := C.rados_ioctx_create(cluster.handle, p, &ioContext)
 	if err := toRadosError(ret); err != nil {
@@ -145,12 +143,12 @@ func (pool *Pool) Id() int64 {
 
 // Name returns the name of the pool.
 func (pool *Pool) Name() string {
-	buf := make([]byte, 64)
+	bufLen := 64
 	for {
-		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
-		ret := C.rados_ioctx_get_pool_name(pool.context, bufAddr, C.unsigned(len(buf)))
+		bufAddr := bufferAddress(bufLen)
+		ret := C.rados_ioctx_get_pool_name(pool.context, bufAddr, C.unsigned(bufLen))
 		if int(ret) == -int(syscall.ERANGE) {
-			buf = make([]byte, len(buf)*2)
+			bufLen *= 2
 			continue
 		}
 		return C.GoStringN(bufAddr, ret)
@@ -170,27 +168,30 @@ func (pool *Pool) RequiredAlignment() uint64 {
 
 // ListPools returns all the pools in the ceph cluster.
 func (cluster *Cluster) ListPools() ([]string, error) {
-	buf := make([]byte, 4096)
+	bufLen := 4096
 	pools := make([]string, 0)
 	for {
-		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
-		ret := C.rados_pool_list(cluster.handle, bufAddr, C.size_t(len(buf)))
+		bufAddr := bufferAddress(bufLen)
+		ret := C.rados_pool_list(cluster.handle, bufAddr, C.size_t(bufLen))
 		if ret < 0 {
 			err := toRadosError(ret)
 			err.Message = "Unable to retrieve pool list"
 			return nil, err
 		}
 
-		if int(ret) > len(buf) {
-			buf = make([]byte, ret)
+		if int(ret) > bufLen {
+			bufLen = int(ret)
 			continue
 		}
 
-		tmp := bytes.SplitAfter(buf[:ret-1], []byte{0})
+		reader := bufToReader(bufAddr, ret)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(reader)
+
+		tmp := bytes.SplitAfter(buf.Bytes()[:ret-1], []byte{0})
 		for _, s := range tmp {
 			if len(s) > 0 {
-				pool := C.GoString(bufAddr)
-				pools = append(pools, pool)
+				pools = append(pools, string(s))
 			}
 		}
 
@@ -201,7 +202,7 @@ func (cluster *Cluster) ListPools() ([]string, error) {
 // LookupPool returns the pool ID of the given pool name.
 func (cluster *Cluster) LookupPool(poolName string) (int64, error) {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	poolId := C.rados_pool_lookup(cluster.handle, p)
 	if err := toRadosError(C.int(poolId)); err != nil {
 		err.Message = fmt.Sprintf("Unable to lookup pool ID for %s.", poolName)
@@ -212,12 +213,12 @@ func (cluster *Cluster) LookupPool(poolName string) (int64, error) {
 
 // ReverseLookupPool returns the pool name of the given pool ID.
 func (cluster *Cluster) ReverseLookupPool(id int64) (string, error) {
-	buf := make([]byte, 64)
+	bufLen := 64
 	for {
-		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
-		ret := C.rados_pool_reverse_lookup(cluster.handle, C.int64_t(id), bufAddr, C.size_t(len(buf)))
+		bufAddr := bufferAddress(bufLen)
+		ret := C.rados_pool_reverse_lookup(cluster.handle, C.int64_t(id), bufAddr, C.size_t(bufLen))
 		if int(ret) == -int(syscall.ERANGE) {
-			buf = make([]byte, len(buf)*2)
+			bufLen *= 2
 			continue
 		} else if ret < 0 {
 			err := toRadosError(ret)
@@ -232,7 +233,7 @@ func (cluster *Cluster) ReverseLookupPool(id int64) (string, error) {
 // CreatePool creates a new pool using the given poolName. This uses the default pool configuration.
 func (cluster *Cluster) CreatePool(poolName string) error {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	ret := C.rados_pool_create(cluster.handle, p)
 	err := toRadosError(ret)
 	if err != nil {
@@ -245,7 +246,7 @@ func (cluster *Cluster) CreatePool(poolName string) error {
 // CreatePoolWithOwner creates a new pool using the given poolName and sets it auid.
 func (cluster *Cluster) CreatePoolWithOwner(poolName string, auid uint64) error {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	ret := C.rados_pool_create_with_auid(cluster.handle, p, C.uint64_t(auid))
 	err := toRadosError(ret)
 	if err != nil {
@@ -258,7 +259,7 @@ func (cluster *Cluster) CreatePoolWithOwner(poolName string, auid uint64) error 
 // CreatePoolWithCrushRule creates a new pool using the given poolName with a crushRule set.
 func (cluster *Cluster) CreatePoolWithCrushRule(poolName string, crushRule uint8) error {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	ret := C.rados_pool_create_with_crush_rule(cluster.handle, p, C.uint8_t(crushRule))
 	err := toRadosError(ret)
 	if err != nil {
@@ -271,7 +272,7 @@ func (cluster *Cluster) CreatePoolWithCrushRule(poolName string, crushRule uint8
 // CreatePoolWithAll creates a new pool using the given poolName with both auid and crushRule set.
 func (cluster *Cluster) CreatePoolWithAll(poolName string, auid uint64, crushRule uint8) error {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	ret := C.rados_pool_create_with_all(cluster.handle, p, C.uint64_t(auid), C.uint8_t(crushRule))
 	err := toRadosError(ret)
 	if err != nil {
@@ -284,7 +285,7 @@ func (cluster *Cluster) CreatePoolWithAll(poolName string, auid uint64, crushRul
 // DeletePool removes a pool from the cluster.
 func (cluster *Cluster) DeletePool(poolName string) error {
 	p := C.CString(poolName)
-	defer C.free(unsafe.Pointer(p))
+	defer freeString(p)
 	ret := C.rados_pool_delete(cluster.handle, p)
 	err := toRadosError(ret)
 	if err != nil {

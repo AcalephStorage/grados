@@ -2,8 +2,6 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
@@ -13,7 +11,6 @@ import (
 	"sort"
 	"syscall"
 	"time"
-	"unsafe"
 )
 
 const (
@@ -80,7 +77,7 @@ func (snapshot *ManagedSnapshot) SetAsWriteContext(snapshots ManagedSnapshots) e
 // Rollback will rollback an object to this snapshot. TODO: Needs testing
 func (snapshot *ManagedSnapshot) Rollback(objectId string) error {
 	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
+	defer freeString(oid)
 	ret := C.rados_ioctx_selfmanaged_snap_rollback(snapshot.ioContext, oid, C.rados_snap_t(snapshot.Id))
 	if err := toRadosError(ret); err != nil {
 		err.Message = fmt.Sprintf("Unable to rollback %s to managed pool %d.", objectId, snapshot.Id)
@@ -119,7 +116,7 @@ func (pool *Pool) ListPoolSnapshots() []SnapshotId {
 // CreateSnapshot creates a pool wide snapshot.
 func (pool *Pool) CreatePoolSnapshot(snapshotName string) error {
 	name := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(name))
+	defer freeString(name)
 	ret := C.rados_ioctx_snap_create(pool.context, name)
 	if err := toRadosError(ret); err != nil {
 		err.Message = fmt.Sprintf("Unable to create snapshot %s", snapshotName)
@@ -131,7 +128,7 @@ func (pool *Pool) CreatePoolSnapshot(snapshotName string) error {
 // RemoveSnapshot removes a pool wide snapshot.
 func (pool *Pool) RemovePoolSnapshot(snapshotName string) error {
 	name := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(name))
+	defer freeString(name)
 	ret := C.rados_ioctx_snap_remove(pool.context, name)
 	if err := toRadosError(ret); err != nil {
 		err.Message = fmt.Sprintf("Unable to remove snapshot %s", snapshotName)
@@ -144,8 +141,8 @@ func (pool *Pool) RemovePoolSnapshot(snapshotName string) error {
 func (pool *Pool) RollbackToPoolSnapshot(objectName, snapshotName string) error {
 	object := C.CString(objectName)
 	snapshot := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(object))
-	defer C.free(unsafe.Pointer(snapshot))
+	defer freeString(object)
+	defer freeString(snapshot)
 	ret := C.rados_ioctx_snap_rollback(pool.context, object, snapshot)
 	if err := toRadosError(ret); err != nil {
 		err.Message = fmt.Sprintf("Unable to rollback object %s to snapshot %s", objectName, snapshotName)
@@ -157,7 +154,7 @@ func (pool *Pool) RollbackToPoolSnapshot(objectName, snapshotName string) error 
 // SnapshotLookup returns the id of the given snapshot.
 func (pool *Pool) LookupPoolSnapshot(snapshotName string) (SnapshotId, error) {
 	name := C.CString(snapshotName)
-	defer C.free(unsafe.Pointer(name))
+	defer freeString(name)
 	var id C.rados_snap_t
 	ret := C.rados_ioctx_snap_lookup(pool.context, name, &id)
 	if err := toRadosError(ret); err != nil {
@@ -170,12 +167,12 @@ func (pool *Pool) LookupPoolSnapshot(snapshotName string) (SnapshotId, error) {
 // ReverseLookupSnapshot returns the name of the given pool snapshot id.
 func (pool *Pool) ReverseLookupSnapshot(snapId SnapshotId) (string, error) {
 	id := C.rados_snap_t(snapId)
-	buf := make([]byte, 8)
+	bufLen := 8
 	for {
-		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
-		ret := C.rados_ioctx_snap_get_name(pool.context, id, bufAddr, C.int(len(buf)))
+		bufAddr := bufferAddress(bufLen)
+		ret := C.rados_ioctx_snap_get_name(pool.context, id, bufAddr, C.int(bufLen))
 		if int(ret) == -int(syscall.ERANGE) {
-			buf = make([]byte, len(buf)*2)
+			bufLen *= 2
 			continue
 		}
 		if ret < 0 {
@@ -197,7 +194,6 @@ func (pool *Pool) SnapshotTimestamp(snapId SnapshotId) (time.Time, error) {
 		err.Message = fmt.Sprintf("Unable to retrieve timestamp for snapshot id %d.", snapId)
 		return time.Now(), err
 	}
-	fmt.Println("Time: ", t)
 	goTime := time.Unix(int64(t), 0)
 	return goTime, nil
 }

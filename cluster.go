@@ -2,8 +2,6 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
@@ -11,7 +9,6 @@ import "C"
 import (
 	"fmt"
 	"syscall"
-	"unsafe"
 )
 
 // ClusterStatus represents the status of the cluster.
@@ -51,12 +48,12 @@ func (cluster *Cluster) Config() *ClusterConfig {
 
 // FSID returns the FSID of the cluster.
 func (cluster *Cluster) FSID() string {
-	buf := make([]byte, 37)
+	bufLen := 37
 	for {
-		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
-		ret := C.rados_cluster_fsid(cluster.handle, bufAddr, C.size_t(len(buf)))
+		bufAddr := bufferAddress(bufLen)
+		ret := C.rados_cluster_fsid(cluster.handle, bufAddr, C.size_t(bufLen))
 		if int(ret) == -int(syscall.ERANGE) {
-			buf = make([]byte, len(buf)*2)
+			bufLen *= 2
 			continue
 		}
 		fsid := C.GoStringN(bufAddr, ret)
@@ -73,14 +70,13 @@ func (cluster *Cluster) InstanceId() uint64 {
 // GetConfig returns the configuration value of the given configName.
 func (cluster *Cluster) GetConfigValue(configName string) (string, error) {
 	cn := C.CString(configName)
-	defer C.free(unsafe.Pointer(cn))
-	buf := make([]byte, 8)
+	defer freeString(cn)
+	bufLen := 8
 	for {
-		bufAddr := (*C.char)(unsafe.Pointer(&buf[0]))
-		ret := C.rados_conf_get(cluster.handle, cn, bufAddr, C.size_t(len(buf)))
+		bufAddr := bufferAddress(bufLen)
+		ret := C.rados_conf_get(cluster.handle, cn, bufAddr, C.size_t(bufLen))
 		if int(ret) == -int(syscall.ENAMETOOLONG) {
-			fmt.Println("TOO LONG: ", ret)
-			buf = make([]byte, len(buf)*2)
+			bufLen *= 2
 			continue
 		}
 		if ret < 0 {
@@ -88,7 +84,6 @@ func (cluster *Cluster) GetConfigValue(configName string) (string, error) {
 			err.Message = fmt.Sprintf("Unable to get config value of %s.", configName)
 			return "", err
 		}
-		fmt.Println("RET: ", ret)
 		value := C.GoString(bufAddr)
 		return value, nil
 	}

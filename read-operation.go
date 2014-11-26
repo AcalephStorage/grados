@@ -2,16 +2,12 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
 
 import (
-	"bytes"
 	"io"
-	"unsafe"
 )
 
 type ReadOperation struct {
@@ -53,10 +49,6 @@ func (ro *ReadOperation) AssertExists() *ReadOperation {
 
 func (ro *ReadOperation) CompareAttribute(name string, operator CompareAttribute, value io.Reader) *ReadOperation {
 	n := C.CString(name)
-	defer C.free(unsafe.Pointer(n))
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(value)
-	bufAddr := (*C.char)(unsafe.Pointer(&buf.Bytes()[0]))
-	C.rados_read_op_cmpxattr(ro.opContext, n, C.uint8_t(operator), bufAddr, C.size_t(buf.Len()))
+	defer freeString(n)
 	return ro
 }

@@ -2,18 +2,14 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"time"
-	"unsafe"
 )
 
 // SetLocatorKey sets the key for mapping objects to pgs.
@@ -26,7 +22,7 @@ import (
 // in the same pg.
 func (pool *Pool) SetLocatorKey(key string) {
 	k := C.CString(key)
-	defer C.free(unsafe.Pointer(k))
+	defer freeString(k)
 	C.rados_ioctx_locator_set_key(pool.context, k)
 }
 
@@ -36,7 +32,7 @@ func (pool *Pool) SetLocatorKey(key string) {
 // based on this value.
 func (pool *Pool) SetNamespace(namespace string) {
 	n := C.CString(namespace)
-	defer C.free(unsafe.Pointer(n))
+	defer freeString(n)
 	C.rados_ioctx_set_namespace(pool.context, n)
 }
 
@@ -45,115 +41,113 @@ func (pool *Pool) LastObjectVersion() uint64 {
 	return uint64(C.rados_get_last_version(pool.context))
 }
 
-// WriteToObject writes the data at a specific offset to the given objectId.
-func (pool *Pool) WriteToObject(objectId string, data io.Reader, offset uint64) error {
-	dataBuf := new(bytes.Buffer)
-	dataBuf.ReadFrom(data)
+type Object struct {
+	ioContext C.rados_ioctx_t
+	Name      string
+}
 
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
+func (pool *Pool) ManageObject(name string) *Object {
+	return &Object{
+		ioContext: pool.context,
+		Name:      name,
+	}
+}
 
-	bufAddr := (*C.char)(unsafe.Pointer(&dataBuf.Bytes()[0]))
-
-	ret := C.rados_write(pool.context, oid, bufAddr, C.size_t(dataBuf.Len()), C.uint64_t(offset))
+// Write writes the data at a specific offset to the object.
+func (o *Object) Write(data io.Reader, offset uint64) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	bufAddr, length := readerToBuf(data)
+	ret := C.rados_write(o.ioContext, oid, bufAddr, length, C.uint64_t(offset))
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to write data to object %s", objectId)
+		err.Message = fmt.Sprintf("Unable to write data to object %s", o.Name)
 		return err
 	}
 	return nil
 }
 
-// WriteFullToObject writes the data to object replacing old data
-func (pool *Pool) WriteFullToObject(objectId string, data io.Reader) error {
-	dataBuf := new(bytes.Buffer)
-	dataBuf.ReadFrom(data)
-
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
-
-	bufAddr := (*C.char)(unsafe.Pointer(&dataBuf.Bytes()[0]))
-	ret := C.rados_write_full(pool.context, oid, bufAddr, C.size_t(dataBuf.Len()))
+// WriteFull writes the entire data to the object replacing old data.
+func (o *Object) WriteFull(data io.Reader) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	bufAddr, length := readerToBuf(data)
+	ret := C.rados_write_full(o.ioContext, oid, bufAddr, length)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to write full data to object %s", objectId)
+		err.Message = fmt.Sprintf("Unable to write full data to object %s", o.Name)
 		return err
 	}
 	return nil
 }
 
-// AppendToObject appends new data to an object
-func (pool *Pool) AppendToObject(objectId string, data io.Reader) error {
-	dataBuf := new(bytes.Buffer)
-	dataBuf.ReadFrom(data)
-
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
-	bufAddr := (*C.char)(unsafe.Pointer(&dataBuf.Bytes()[0]))
-	ret := C.rados_append(pool.context, oid, bufAddr, C.size_t(dataBuf.Len()))
+// Append appends new data to the object
+func (o *Object) Append(data io.Reader) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	bufAddr, length := readerToBuf(data)
+	ret := C.rados_append(o.ioContext, oid, bufAddr, length)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to append data to object %s", objectId)
+		err.Message = fmt.Sprintf("Unable to append data to object %s", o.Name)
 		return err
 	}
 	return nil
 }
 
-// ReadFromObject reads a specified length of data from the object starting at the given offset.
-func (pool *Pool) ReadFromObject(objectId string, length, offset uint64) (io.Reader, error) {
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
-
-	buf := make([]byte, int(length))
-	bufAddr := unsafe.Pointer(&buf[0])
-
-	ret := C.rados_read(pool.context, oid, (*C.char)(bufAddr), C.size_t(length), C.uint64_t(offset))
+// Read reads a specified length of data from the object starting at the given offset.
+func (o *Object) Read(length, offset uint64) (io.Reader, error) {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	bufAddr := bufferAddress(int(length))
+	ret := C.rados_read(o.ioContext, oid, bufAddr, C.size_t(length), C.uint64_t(offset))
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to read object %s.", objectId)
+		err.Message = fmt.Sprintf("Unable to read object %s.", o.Name)
 		return nil, err
 	}
-	data := C.GoBytes(bufAddr, ret)
-	dataBuf := bytes.NewBuffer(data)
-	return dataBuf, nil
+	return bufToReader(bufAddr, ret), nil
 }
 
-// RemoveObject removes an object from the pool.
-func (pool *Pool) RemoveObject(objectId string) error {
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
-	ret := C.rados_remove(pool.context, oid)
+// Remove removes the object from the pool.
+func (o *Object) Remove() error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	ret := C.rados_remove(o.ioContext, oid)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to delete object %s", objectId)
+		err.Message = fmt.Sprintf("Unable to delete object %s", o.Name)
 		return err
 	}
 	return nil
 }
 
-// ResizeObject modifies the size of an object. If the object size is increases, the new space is zero-filled. If the
-// size is reduced, the excess data is removed.
-func (pool *Pool) ResizeObject(objectId string, newSize uint64) error {
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
-	size := C.uint64_t(newSize)
-	ret := C.rados_trunc(pool.context, oid, size)
+// Truncate modifies the size of an object. If the object size in increased, the new space is zero-filled. If the size
+// is reduced, the excess data is removed.
+func (o *Object) Truncate(size uint64) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	s := C.uint64_t(size)
+	ret := C.rados_trunc(o.ioContext, oid, s)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to resize object %s to size %d.", objectId, newSize)
+		err.Message = fmt.Sprintf("Unable to resize object %s to size %d.", o.Name, size)
 		return err
 	}
 	return nil
 }
 
-// CloneObject clones a length of data from an object given an offest to another object starting at an offset. The source
+// Clone clones a length of data from an object given an offest to another object starting at an offset. The source
 // and destination objects must be on the same PG. This requires that a locator key must be set first.
-func (pool *Pool) CloneObject(srcObjId string, srcOffset uint64, destObjId string, destOffset, length uint64) error {
-	srcOid := C.CString(srcObjId)
-	srcOff := C.uint64_t(srcOffset)
-	defer C.free(unsafe.Pointer(srcOid))
+func (o *Object) Clone(target *Object, srcOffset, dstOffset, length uint64) error {
+	srcOid := C.CString(o.Name)
+	dstOid := C.CString(target.Name)
 
-	destOid := C.CString(destObjId)
-	destOff := C.uint64_t(destOffset)
-	defer C.free(unsafe.Pointer(destOid))
+	defer freeString(srcOid)
+	defer freeString(dstOid)
 
-	ret := C.rados_clone_range(pool.context, destOid, destOff, srcOid, srcOff, C.size_t(length))
+	so := C.uint64_t(srcOffset)
+	do := C.uint64_t(dstOffset)
+
+	ln := C.size_t(length)
+
+	ret := C.rados_clone_range(o.ioContext, dstOid, do, srcOid, so, ln)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to clone %s to %s.", srcObjId, destObjId)
+		err.Message = fmt.Sprintf("Unable to clone %s to %s.", o.Name, target.Name)
 		return err
 	}
 	return nil
@@ -164,18 +158,28 @@ type ObjectStatus struct {
 	modifiedTime time.Time
 }
 
-func (pool *Pool) ObjectStatus(objectId string) (*ObjectStatus, error) {
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
+func (o *Object) Status() (*ObjectStatus, error) {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+
 	var objectSize C.uint64_t
 	var modifiedTime C.time_t
-	ret := C.rados_stat(pool.context, oid, &objectSize, &modifiedTime)
+
+	ret := C.rados_stat(o.ioContext, oid, &objectSize, &modifiedTime)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to get status for object %s.", objectId)
+		err.Message = fmt.Sprintf("Unable to get status for object %s.", o.Name)
 		return nil, err
 	}
 	return &ObjectStatus{
 		size:         uint64(objectSize),
 		modifiedTime: time.Unix(int64(modifiedTime), 0),
 	}, nil
+}
+
+func (o *Object) SetAllocationHint(expectedObjectSize, expectedWriteSize uint64) {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+	es := C.uint64_t(expectedObjectSize)
+	ews := C.uint64_t(expectedWriteSize)
+	C.rados_set_alloc_hint(o.ioContext, oid, es, ews)
 }

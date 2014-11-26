@@ -2,8 +2,6 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
@@ -12,7 +10,6 @@ import (
 	"bytes"
 	"io"
 	"time"
-	"unsafe"
 )
 
 type WriteOperation struct {
@@ -54,7 +51,7 @@ func (wo *WriteOperation) AssertExists() *WriteOperation {
 
 func (wo *WriteOperation) CompareAttribute(attributeName string, operator CompareAttribute, value io.Reader) *WriteOperation {
 	name := C.CString(attributeName)
-	defer C.free(unsafe.Pointer(name))
+	defer freeString(name)
 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(value)
@@ -67,7 +64,7 @@ func (wo *WriteOperation) CompareAttribute(attributeName string, operator Compar
 
 func (wo *WriteOperation) SetAttribute(name string, value io.Reader) *WriteOperation {
 	n := C.CString(name)
-	defer C.free(unsafe.Pointer(n))
+	defer freeString(n)
 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(value)
@@ -79,40 +76,34 @@ func (wo *WriteOperation) SetAttribute(name string, value io.Reader) *WriteOpera
 
 func (wo *WriteOperation) RemoveAttribute(name string) *WriteOperation {
 	n := C.CString(name)
-	defer C.free(unsafe.Pointer(n))
+	defer freeString(n)
 	C.rados_write_op_rmxattr(wo.opContext, n)
 	return wo
 }
 
 func (wo *WriteOperation) CreateObject(mode CreateMode, category string) *WriteOperation {
 	c := C.CString(category)
-	defer C.free(unsafe.Pointer(c))
+	defer freeString(c)
 
 	C.rados_write_op_create(wo.opContext, C.int(mode), c)
 	return wo
 }
 
 func (wo *WriteOperation) Write(data io.Reader, offset uint64) *WriteOperation {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(data)
-	bufAddr := (*C.char)(unsafe.Pointer(&buf.Bytes()[0]))
-	C.rados_write_op_write(wo.opContext, bufAddr, C.size_t(buf.Len()), C.uint64_t(offset))
+	bufAddr, bufLen := readerToBuf(data)
+	C.rados_write_op_write(wo.opContext, bufAddr, C.size_t(bufLen), C.uint64_t(offset))
 	return wo
 }
 
 func (wo *WriteOperation) WriteFull(data io.Reader) *WriteOperation {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(data)
-	bufAddr := (*C.char)(unsafe.Pointer(&buf.Bytes()[0]))
-	C.rados_write_op_write_full(wo.opContext, bufAddr, C.size_t(buf.Len()))
+	bufAddr, bufLen := readerToBuf(data)
+	C.rados_write_op_write_full(wo.opContext, bufAddr, C.size_t(bufLen))
 	return wo
 }
 
 func (wo *WriteOperation) Append(data io.Reader) *WriteOperation {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(data)
-	bufAddr := (*C.char)(unsafe.Pointer(&buf.Bytes()[0]))
-	C.rados_write_op_append(wo.opContext, bufAddr, C.size_t(buf.Len()))
+	bufAddr, bufLen := readerToBuf(data)
+	C.rados_write_op_append(wo.opContext, bufAddr, C.size_t(bufLen))
 	return wo
 }
 
@@ -131,17 +122,20 @@ func (wo *WriteOperation) Zero(offset, length uint64) *WriteOperation {
 	return wo
 }
 
-func (wo *WriteOperation) Operate(objectId string, modifiedTime *time.Time, flags ...LibradosOperation) error {
-	oid := C.CString(objectId)
-	defer C.free(unsafe.Pointer(oid))
+func (wo *WriteOperation) Operate(object *Object, modifiedTime *time.Time, flags ...LibradosOperation) error {
+	oid := C.CString(object.Name)
+	defer freeString(oid)
+
 	var mtime C.time_t
 	if modifiedTime != nil {
 		mtime = C.time_t(modifiedTime.Unix())
 	}
+
 	var f C.int = 0
 	for _, flag := range flags {
 		f |= C.int(flag)
 	}
+
 	ret := C.rados_write_op_operate(wo.opContext, wo.ioContext, oid, &mtime, f)
 	if err := toRadosError(ret); err != nil {
 		err.Message = "Unable to perform write operation."

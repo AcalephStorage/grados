@@ -20,14 +20,14 @@ func TestIterateObjects(t *testing.T) {
 		return
 	}
 
-	pool.WriteFullToObject("object1", bytes.NewBufferString("data1"))
-	pool.WriteFullToObject("object2", bytes.NewBufferString("data2"))
-	pool.WriteFullToObject("object3", bytes.NewBufferString("data3"))
+	pool.ManageObject("object1").WriteFull(bytes.NewBufferString("data1"))
+	pool.ManageObject("object2").WriteFull(bytes.NewBufferString("data2"))
+	pool.ManageObject("object3").WriteFull(bytes.NewBufferString("data3"))
 
 	objectList, err := pool.OpenObjectList()
 	for i := 0; i < 3; i++ {
-		objectId, locationKey, err := objectList.Next()
-		t.Logf("%s:%s", objectId, locationKey)
+		object, locationKey, err := objectList.Next()
+		t.Logf("%s:%s", object.Name, locationKey)
 		if err != nil {
 			t.Error("error: ", err)
 		}

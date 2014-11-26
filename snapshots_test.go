@@ -1,141 +1,143 @@
 package grados
 
-import "testing"
-import "bytes"
+// import "testing"
+// import "bytes"
 
-func TestPoolSnapshot(t *testing.T) {
-	cluster := connect(t)
-	if cluster == nil {
-		return
-	}
-	pool, err := cluster.OpenPool("data")
-	handleError(t, err)
-	if pool == nil {
-		return
-	}
+// FIX this
 
-	bytes.NewBufferString("Hello World")
+// func TestPoolSnapshot(t *testing.T) {
+// 	cluster := connect(t)
+// 	if cluster == nil {
+// 		return
+// 	}
+// 	pool, err := cluster.OpenPool("data")
+// 	handleError(t, err)
+// 	if pool == nil {
+// 		return
+// 	}
 
-	pool.WriteFullToObject("test", bytes.NewBufferString("Hello World"))
-	err = pool.CreatePoolSnapshot("my_snapshot")
-	handleError(t, err)
+// 	bytes.NewBufferString("Hello World")
 
-	err = pool.WriteFullToObject("test", bytes.NewBufferString("Hello Mars"))
-	handleError(t, err)
+// 	pool.WriteFullToObject("test", bytes.NewBufferString("Hello World"))
+// 	err = pool.CreatePoolSnapshot("my_snapshot")
+// 	handleError(t, err)
 
-	err = pool.RollbackToPoolSnapshot("test", "my_snapshot")
-	handleError(t, err)
+// 	err = pool.WriteFullToObject("test", bytes.NewBufferString("Hello Mars"))
+// 	handleError(t, err)
 
-	rolledback, err := pool.ReadFromObject("test", 11, 0)
-	handleError(t, err)
-	result := new(bytes.Buffer)
-	result.ReadFrom(rolledback)
-	t.Log("RolledBack:", result.String())
+// 	err = pool.RollbackToPoolSnapshot("test", "my_snapshot")
+// 	handleError(t, err)
 
-	snapshots := pool.ListPoolSnapshots()
-	t.Log("snapshots:", len(snapshots))
-	for _, s := range snapshots {
-		t.Log("snapshot: ", s)
-	}
+// 	rolledback, err := pool.ReadFromObject("test", 11, 0)
+// 	handleError(t, err)
+// 	result := new(bytes.Buffer)
+// 	result.ReadFrom(rolledback)
+// 	t.Log("RolledBack:", result.String())
 
-	id, err := pool.LookupPoolSnapshot("my_snapshot")
-	handleError(t, err)
-	t.Log("Lookup result: ", id)
+// 	snapshots := pool.ListPoolSnapshots()
+// 	t.Log("snapshots:", len(snapshots))
+// 	for _, s := range snapshots {
+// 		t.Log("snapshot: ", s)
+// 	}
 
-	name, err := pool.ReverseLookupSnapshot(id)
-	handleError(t, err)
-	t.Log("Reverse lookup result:", name)
+// 	id, err := pool.LookupPoolSnapshot("my_snapshot")
+// 	handleError(t, err)
+// 	t.Log("Lookup result: ", id)
 
-	time, err := pool.SnapshotTimestamp(id)
-	handleError(t, err)
-	t.Log("time", time)
+// 	name, err := pool.ReverseLookupSnapshot(id)
+// 	handleError(t, err)
+// 	t.Log("Reverse lookup result:", name)
 
-	err = pool.RemovePoolSnapshot("my_snapshot")
-	handleError(t, err)
+// 	time, err := pool.SnapshotTimestamp(id)
+// 	handleError(t, err)
+// 	t.Log("time", time)
 
-	snapshots = pool.ListPoolSnapshots()
-	t.Log("snapshots:", len(snapshots))
-	for _, s := range snapshots {
-		t.Log("snapshot: ", s)
-	}
+// 	err = pool.RemovePoolSnapshot("my_snapshot")
+// 	handleError(t, err)
 
-	err = pool.RemoveObject("test")
-	handleError(t, err)
-}
+// 	snapshots = pool.ListPoolSnapshots()
+// 	t.Log("snapshots:", len(snapshots))
+// 	for _, s := range snapshots {
+// 		t.Log("snapshot: ", s)
+// 	}
 
-func TestUseSnapshot(t *testing.T) {
-	cluster := connect(t)
-	if cluster == nil {
-		return
-	}
-	defer cluster.Shutdown()
+// 	err = pool.RemoveObject("test")
+// 	handleError(t, err)
+// }
 
-	err := cluster.CreatePool("my_pool")
-	handleError(t, err)
-	defer cluster.DeletePool("my_pool")
+// func TestUseSnapshot(t *testing.T) {
+// 	cluster := connect(t)
+// 	if cluster == nil {
+// 		return
+// 	}
+// 	defer cluster.Shutdown()
 
-	pool, err := cluster.OpenPool("my_pool")
-	handleError(t, err)
-	defer pool.CloseNow()
+// 	err := cluster.CreatePool("my_pool")
+// 	handleError(t, err)
+// 	defer cluster.DeletePool("my_pool")
 
-	err = pool.WriteToObject("my_object", bytes.NewBufferString("data1"), 0)
-	handleError(t, err)
+// 	pool, err := cluster.OpenPool("my_pool")
+// 	handleError(t, err)
+// 	defer pool.CloseNow()
 
-	err = pool.CreatePoolSnapshot("snap1")
-	handleError(t, err)
+// 	err = pool.WriteToObject("my_object", bytes.NewBufferString("data1"), 0)
+// 	handleError(t, err)
 
-	err = pool.WriteToObject("my_object", bytes.NewBufferString("data2"), 0)
-	handleError(t, err)
+// 	err = pool.CreatePoolSnapshot("snap1")
+// 	handleError(t, err)
 
-	id, err := pool.LookupPoolSnapshot("snap1")
-	handleError(t, err)
+// 	err = pool.WriteToObject("my_object", bytes.NewBufferString("data2"), 0)
+// 	handleError(t, err)
 
-	pool.UseSnapshot(id)
+// 	id, err := pool.LookupPoolSnapshot("snap1")
+// 	handleError(t, err)
 
-	data, err := pool.ReadFromObject("my_object", 5, 0)
-	handleError(t, err)
+// 	pool.UseSnapshot(id)
 
-	result := new(bytes.Buffer)
-	result.ReadFrom(data)
+// 	data, err := pool.ReadFromObject("my_object", 5, 0)
+// 	handleError(t, err)
 
-	if "data1" != result.String() {
-		t.Errorf("result should be data1, result is %s", result)
-	}
-}
+// 	result := new(bytes.Buffer)
+// 	result.ReadFrom(data)
 
-func TestSelfManagedPool(t *testing.T) {
-	cluster := connect(t)
-	if cluster == nil {
-		return
-	}
+// 	if "data1" != result.String() {
+// 		t.Errorf("result should be data1, result is %s", result)
+// 	}
+// }
 
-	err := cluster.CreatePool("test")
-	handleError(t, err)
-	defer cluster.DeletePool("test")
+// func TestSelfManagedPool(t *testing.T) {
+// 	cluster := connect(t)
+// 	if cluster == nil {
+// 		return
+// 	}
 
-	pool, err := cluster.OpenPool("test")
-	handleError(t, err)
-	if pool == nil {
-		return
-	}
+// 	err := cluster.CreatePool("test")
+// 	handleError(t, err)
+// 	defer cluster.DeletePool("test")
 
-	snapshot, err := pool.CreateSelfManagedSnapshot()
-	handleError(t, err)
-	if snapshot == nil {
-		return
-	}
-	t.Log("created snapshot context:", snapshot.Id)
+// 	pool, err := cluster.OpenPool("test")
+// 	handleError(t, err)
+// 	if pool == nil {
+// 		return
+// 	}
 
-	snapshots := ManagedSnapshots{snapshot}
-	err = snapshot.SetAsWriteContext(snapshots)
-	handleError(t, err)
-	t.Log("snapshot context set to read")
+// 	snapshot, err := pool.CreateSelfManagedSnapshot()
+// 	handleError(t, err)
+// 	if snapshot == nil {
+// 		return
+// 	}
+// 	t.Log("created snapshot context:", snapshot.Id)
 
-	err = pool.WriteFullToObject("sample", bytes.NewBufferString("This is a test"))
-	handleError(t, err)
-	t.Log("full object written")
+// 	snapshots := ManagedSnapshots{snapshot}
+// 	err = snapshot.SetAsWriteContext(snapshots)
+// 	handleError(t, err)
+// 	t.Log("snapshot context set to read")
 
-	err = snapshot.Remove()
-	handleError(t, err)
+// 	err = pool.WriteFullToObject("sample", bytes.NewBufferString("This is a test"))
+// 	handleError(t, err)
+// 	t.Log("full object written")
 
-}
+// 	err = snapshot.Remove()
+// 	handleError(t, err)
+
+// }

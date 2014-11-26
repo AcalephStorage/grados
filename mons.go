@@ -2,19 +2,15 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
-
-import "unsafe"
 
 // PingMonitor will query the given monitor to check it's status
 // TODO: Make struct for result
 func (cluster *Cluster) PingMonitor(monitorId string) (string, error) {
 	monId := C.CString(monitorId)
-	defer C.free(unsafe.Pointer(monId))
+	defer freeString(monId)
 
 	var outLen C.size_t
 	var out *C.char

@@ -2,8 +2,6 @@ package grados
 
 /*
 #cgo LDFLAGS: -lrados
-
-#include <stdlib.h>
 #include <rados/librados.h>
 */
 import "C"
@@ -11,7 +9,6 @@ import "C"
 import (
 	"fmt"
 	"os"
-	"unsafe"
 )
 
 // RadosError contains the error code returned from call the librados functions. The message is some (maybe) helpful
@@ -178,14 +175,14 @@ func (conn *Connection) createClusterHandle() error {
 	case conn.ClusterName != "" && conn.UserName != "":
 		cluster := C.CString(conn.ClusterName)
 		user := C.CString(conn.UserName)
-		defer C.free(unsafe.Pointer(cluster))
-		defer C.free(unsafe.Pointer(user))
+		defer freeString(cluster)
+		defer freeString(user)
 		ret = C.rados_create2(&conn.cluster.handle, cluster, user, 0)
 
 	// use rados_create() with the given UserName
 	case conn.ClusterName == "" && conn.UserName != "":
 		user := C.CString(conn.UserName)
-		defer C.free(unsafe.Pointer(user))
+		defer freeString(user)
 		ret = C.rados_create(&conn.cluster.handle, user)
 
 	// use rados_create() with a nil user
@@ -221,7 +218,7 @@ func (conn *Connection) configure() error {
 	// use config file if specified
 	if conn.ConfigFile != "" {
 		config := C.CString(conn.ConfigFile)
-		defer C.free(unsafe.Pointer(config))
+		defer freeString(config)
 		ret := C.rados_conf_read_file(conn.cluster.handle, config)
 		if err := toRadosError(ret); err != nil {
 			err.Message = "Unable to load configuration file. Make sure it exists and is accessible."
@@ -232,7 +229,7 @@ func (conn *Connection) configure() error {
 	// use config env if specified
 	if conn.ConfigEnv != "" {
 		env := C.CString(conn.ConfigEnv)
-		defer C.free(unsafe.Pointer(env))
+		defer freeString(env)
 		ret := C.rados_conf_parse_env(conn.cluster.handle, env)
 		if err := toRadosError(ret); err != nil {
 			err.Message = "Unable to load configuration from env."
@@ -246,7 +243,7 @@ func (conn *Connection) configure() error {
 		argv := make([]*C.char, argc)
 		for i, arg := range os.Args {
 			argv[i] = C.CString(arg)
-			defer C.free(unsafe.Pointer(argv[i+1]))
+			defer freeString(argv[i+1])
 		}
 		ret := C.rados_conf_parse_argv(conn.cluster.handle, argc, &argv[0])
 		if err := toRadosError(ret); err != nil {
@@ -259,8 +256,8 @@ func (conn *Connection) configure() error {
 		for k, v := range conn.ConfigMap {
 			key := C.CString(k)
 			val := C.CString(v)
-			defer C.free(unsafe.Pointer(key))
-			defer C.free(unsafe.Pointer(val))
+			defer freeString(key)
+			defer freeString(val)
 			ret := C.rados_conf_set(conn.cluster.handle, key, val)
 			if err := toRadosError(ret); err != nil {
 				err.Message = fmt.Sprintf("Unable to load config %s=%s", key, val)
