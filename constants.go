@@ -11,6 +11,7 @@ type LibradosOpFlag int
 type CompareAttribute int
 type CreateMode int
 type LibradosOperation int
+type LibradosLock int
 
 const (
 	OperationExclusive LibradosOpFlag = C.LIBRADOS_OP_FLAG_EXCL
@@ -33,4 +34,6 @@ const (
 	IgnoreCache     LibradosOperation = C.LIBRADOS_OPERATION_IGNORE_CACHE
 	SkipRWLocks     LibradosOperation = C.LIBRADOS_OPERATION_SKIPRWLOCKS
 	IgnoreOverlay   LibradosOperation = C.LIBRADOS_OPERATION_IGNORE_OVERLAY
+
+	Renew LibradosLock = C.LIBRADOS_LOCK_FLAG_RENEW
 )

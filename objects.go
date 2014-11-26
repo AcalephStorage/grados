@@ -9,6 +9,7 @@ import "C"
 import (
 	"fmt"
 	"io"
+	"syscall"
 	"time"
 )
 
@@ -182,4 +183,118 @@ func (o *Object) SetAllocationHint(expectedObjectSize, expectedWriteSize uint64)
 	es := C.uint64_t(expectedObjectSize)
 	ews := C.uint64_t(expectedWriteSize)
 	C.rados_set_alloc_hint(o.ioContext, oid, es, ews)
+}
+
+// TODO: add lock duration
+func (o *Object) LockExclusive(name, cookie, description string, flags ...LibradosLock) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+
+	n := C.CString(name)
+	defer freeString(n)
+
+	c := C.CString(cookie)
+	defer freeString(c)
+
+	d := C.CString(description)
+	defer freeString(d)
+
+	f := 0
+	for _, flag := range flags {
+		f |= flag
+	}
+	ret := C.rados_lock_exclusive(o.ioContext, oid, n, c, d, nil, C.uint8_t(f))
+	switch int(ret) {
+	case -int(syscall.EBUSY):
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s is already locked by another client", o.Name)
+		return err
+	case -int(syscall.EEXIST):
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s is already locked by current client", o.Name)
+		return err
+	}
+	return nil
+}
+
+// TODO: add lock duration
+func (o *Object) LockShared(name, cookie, tag description, string, flags ...LibradosLock) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+
+	n := C.CString(name)
+	defer freeString(n)
+
+	c := C.CString(cookie)
+	defer freeString(c)
+
+	t := C.CString(tag)
+	defer freeString(t)
+
+	d := C.CString(description)
+	defer freeString(d)
+
+	f := 0
+	for _, flag := range flags {
+		f |= flag
+	}
+
+	ret := C.rados_lock_shared(o.ioContext, oid, n, c, t, d, nil, C.uint8_t(f))
+	switch int(ret) {
+	case -int(syscall.EBUSY):
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s is already locked by another client", o.Name)
+		return err
+	case -int(syscall.EEXIST):
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s is already locked by current client", o.Name)
+		return err
+	}
+	return nil
+}
+
+func (o *Object) Unlock(name, cookie string) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+
+	n := C.CString(name)
+	defer freeString(n)
+
+	c := C.CString(cookie)
+	defer freeString(c)
+
+	ret := C.rados_unlock(o.ioContext, oid, n, c)
+	if int(ret) == -int(syscall.ENOENT) {
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s does not own the lock.", o.Name)
+		return err
+	}
+	return nil
+}
+
+func (o *Object) BreakLock(name, client, cookie string) error {
+	oid := C.CString(o.Name)
+	defer freeString(oid)
+
+	n := C.CString(name)
+	defer freeString(n)
+
+	cl := C.CString(client)
+	defer freeString(cl)
+
+	c := C.CString(cookie)
+	defer freeString(c)
+
+	ret := C.rados_break_lock(o.ioContext, oid, n, cl, c)
+	switch int(ret) {
+	case -int(syscall.ENOENT):
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s lock is not held by %s:%s", o.Name, client, cookie)
+		return err
+	case -int(syscall.EINVAL):
+		err := toRadosError(ret)
+		err.Message = fmt.Sprintf("%s client cannot be parsed.", client)
+		return err
+	}
+	return nil
 }
