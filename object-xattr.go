@@ -11,10 +11,12 @@ import (
 	"io"
 )
 
+// AttributeList is an iterator to an object's extended attributes.
 type AttributeList struct {
 	iterator C.rados_xattrs_iter_t
 }
 
+// OpenAttributeList returns an iterator of the object's attributes.
 func (o *Object) OpenAttributeList() (*AttributeList, error) {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -30,6 +32,7 @@ func (o *Object) OpenAttributeList() (*AttributeList, error) {
 	return al, nil
 }
 
+// Next returns the next extended attribute. This returns an error when there are no more attributes.
 func (i *AttributeList) Next() (name string, value io.Reader, err error) {
 	var n *C.char
 	var v *C.char
@@ -49,10 +52,12 @@ func (i *AttributeList) Next() (name string, value io.Reader, err error) {
 	return
 }
 
+// Close closes the iterator. The iterator should not be used after this.
 func (i *AttributeList) Close() {
 	C.rados_getxattrs_end(i.iterator)
 }
 
+// Attribute returns an extended attribute of the object.
 func (o *Object) Attribute(attributeName string) (io.Reader, error) {
 	object := C.CString(o.name)
 	attribute := C.CString(attributeName)
@@ -71,6 +76,7 @@ func (o *Object) Attribute(attributeName string) (io.Reader, error) {
 	return attribbuf, nil
 }
 
+// SetAttribute sets an extended attribute of the object.
 func (o *Object) SetAttribute(attributeName string, attributeValue io.Reader) error {
 	object := C.CString(o.name)
 	attribute := C.CString(attributeName)
@@ -87,6 +93,7 @@ func (o *Object) SetAttribute(attributeName string, attributeValue io.Reader) er
 	return nil
 }
 
+// RemoveAttribute removes an attribute of the object.
 func (o *Object) RemoveAttribute(attributeName string) error {
 	object := C.CString(o.name)
 	attribute := C.CString(attributeName)

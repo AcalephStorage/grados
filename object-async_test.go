@@ -9,7 +9,7 @@ func TestAsyncWriteAppend(t *testing.T) {
 		return
 	}
 
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	if pool == nil {
 		return

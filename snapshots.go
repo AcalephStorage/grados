@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-const (
-	NoSnapshot = C.LIBRADOS_SNAP_HEAD
-)
-
 type SnapshotId uint64
 
 // ManagedSnapshot is a reference to a self managed snapshot Id.

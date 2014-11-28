@@ -14,7 +14,7 @@ func TestIterateObjects(t *testing.T) {
 		return
 	}
 
-	pool, err := cluster.OpenPool("objectListTest")
+	pool, err := cluster.ManagePool("objectListTest")
 	if err != nil {
 		t.Error("Unable to open pool")
 		return

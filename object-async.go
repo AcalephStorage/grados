@@ -11,9 +11,17 @@ import (
 	"io"
 )
 
+// AsyncIoCallback is the signature of a callback function that can be used on asynchronous operations. This can receive
+// a number of arguments that is passed during async function calls or can contain result data from the asychronous
+// operation.
 type AsyncIoCallback func(args ...interface{})
+
+// ASyncIoErrorCallback is the signature of a callback function that will be called when an asynchronous operation has
+// an unexpected error.
 type ASyncIoErrorCallback func(err error, args ...interface{})
 
+// AsyncObject represents an object ready for asynchronous operations. Use AsyncMode from an object instance to create
+// a valid AsyncObjet instance.
 type AsyncObject struct {
 	ioContext  C.rados_ioctx_t
 	name       string
@@ -24,6 +32,8 @@ type AsyncObject struct {
 	args       []interface{}
 }
 
+// AsyncMode Prepares the object for asynchronous operations. If callbacks are set to nil, the results will be ignored.
+// args passed here will be passed to the callbacks.
 func (o *Object) AsyncMode(onComplete, onSafe AsyncIoCallback, onError ASyncIoErrorCallback, args ...interface{}) *AsyncObject {
 	a := &AsyncObject{
 		ioContext:  o.ioContext,
@@ -36,10 +46,12 @@ func (o *Object) AsyncMode(onComplete, onSafe AsyncIoCallback, onError ASyncIoEr
 	return a
 }
 
+// Release stops asynchronous mode. No asynchronous operations should be done to the AsyncObject after this is called.
 func (ao *AsyncObject) Release() {
 	C.rados_aio_release(ao.completion)
 }
 
+// Write performes a write operation asynchronously.
 func (ao *AsyncObject) Write(data io.Reader, offset uint64) {
 	go func() {
 		oid := C.CString(ao.name)
@@ -53,6 +65,7 @@ func (ao *AsyncObject) Write(data io.Reader, offset uint64) {
 	}()
 }
 
+// WriteFull performs a full write operation asynchronously.
 func (ao *AsyncObject) WriteFull(data io.Reader) {
 	go func() {
 		oid := C.CString(ao.name)
@@ -68,6 +81,7 @@ func (ao *AsyncObject) WriteFull(data io.Reader) {
 	}()
 }
 
+// Append performs an append operation asynchronously.
 func (ao *AsyncObject) Append(data io.Reader) {
 	go func() {
 		oid := C.CString(ao.name)
@@ -82,7 +96,7 @@ func (ao *AsyncObject) Append(data io.Reader) {
 }
 
 // Read reads from the object a specific length starting at the given offset. The read data is stored in an io.Reader
-// and is appended to the end of the args passed to the onComplete and onSafe callbacks.
+// and is appended at the end of the args passed to the onComplete and onSafe callbacks.
 func (ao *AsyncObject) Read(length, offset uint64) {
 	go func() {
 		oid := C.CString(ao.name)
@@ -115,6 +129,7 @@ func (ao *AsyncObject) Read(length, offset uint64) {
 
 }
 
+// Remove removes an object asynchronously.
 func (ao *AsyncObject) Remove() {
 	go func() {
 		oid := C.CString(ao.name)
@@ -127,6 +142,7 @@ func (ao *AsyncObject) Remove() {
 	}()
 }
 
+// helper method to call the error callback.
 func (ao *AsyncObject) processError(ret C.int, msg string) bool {
 	if err := toRadosError(ret); err != nil {
 		err.Message = msg
@@ -138,6 +154,7 @@ func (ao *AsyncObject) processError(ret C.int, msg string) bool {
 	return false
 }
 
+// helper method to call the onComplete and onsafe callbacks.
 func (ao *AsyncObject) completeOperation() {
 	go func() {
 		if ao.onComplete != nil {

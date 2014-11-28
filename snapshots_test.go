@@ -10,7 +10,7 @@ package grados
 // 	if cluster == nil {
 // 		return
 // 	}
-// 	pool, err := cluster.OpenPool("data")
+// 	pool, err := cluster.ManagePool("data")
 // 	handleError(t, err)
 // 	if pool == nil {
 // 		return
@@ -76,7 +76,7 @@ package grados
 // 	handleError(t, err)
 // 	defer cluster.DeletePool("my_pool")
 
-// 	pool, err := cluster.OpenPool("my_pool")
+// 	pool, err := cluster.ManagePool("my_pool")
 // 	handleError(t, err)
 // 	defer pool.CloseNow()
 
@@ -115,7 +115,7 @@ package grados
 // 	handleError(t, err)
 // 	defer cluster.DeletePool("test")
 
-// 	pool, err := cluster.OpenPool("test")
+// 	pool, err := cluster.ManagePool("test")
 // 	handleError(t, err)
 // 	if pool == nil {
 // 		return

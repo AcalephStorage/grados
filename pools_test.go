@@ -7,7 +7,7 @@ func TestGetConfigReference(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	config := pool.Config()
 	t.Log("config context:", config.context)
@@ -18,7 +18,7 @@ func TestGetClusterReference(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	c := pool.Cluster()
 	fsid := c.FSID()
@@ -33,7 +33,7 @@ func TestRequiresAlignment(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	alignment := pool.RequiresAlignment()
 	t.Log("RequiresAlignment:", alignment)
@@ -44,7 +44,7 @@ func TestRequiredAlignemnt(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	alignment := pool.RequiredAlignment()
 	t.Log("RequiredAlignment:", alignment)
@@ -147,12 +147,12 @@ func TestGetPoolStats(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	stats, err := pool.Status()
 	handleError(t, err)
 	t.Logf("STATS: %v", stats)
-	pool.CloseNow()
+	pool.Close()
 	cluster.Shutdown()
 }
 
@@ -161,7 +161,7 @@ func TestAuid(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	auid, err := pool.AUID()
 	handleError(t, err)
@@ -170,7 +170,7 @@ func TestAuid(t *testing.T) {
 	handleError(t, err)
 	err = pool.SetAUID(auid)
 	handleError(t, err)
-	pool.CloseNow()
+	pool.Close()
 	cluster.Shutdown()
 }
 
@@ -179,13 +179,13 @@ func TestId(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	id := pool.Id()
 	if id != 0 {
 		t.Errorf("Id should be 0, id is %d", id)
 	}
-	pool.CloseNow()
+	pool.Close()
 	cluster.Shutdown()
 }
 
@@ -194,13 +194,13 @@ func TestName(t *testing.T) {
 	if cluster == nil {
 		return
 	}
-	pool, err := cluster.OpenPool("data")
+	pool, err := cluster.ManagePool("data")
 	handleError(t, err)
 	name := pool.Name()
 	handleError(t, err)
 	if name != "data" {
 		t.Errorf("Name should be data, id is %s", name)
 	}
-	pool.CloseNow()
+	pool.Close()
 	cluster.Shutdown()
 }

@@ -4,47 +4,69 @@ and the librados library.
 
 Usage
 
-To start communicating with ceph, a connection to a cluster needs to be established. There are several ways of
-connecting to a ceph cluster.
+To start communicating with ceph, a connection to a cluster needs to be established.
 
 Connect to the default cluster using the configuration found in /etc/ceph:
 
+		// connect to default cluster
 		cluster, err := rados.ConnectToDefaultCluster()
 
-Or Connect using an existing config context:
+		// disconnect from cluster
+		cluster.Shutdown()
 
-		config := cluster1.Config()
-		cluster2, err := rados.ConnectWithExistingConfig(config)
 
-We can use a different configuration file:
+Basic pool operations can be done:
 
-		cluster, err := rados.new(Connection).UseConfigFile("/path/to/config/file").Connect()
+		// create a pool
+		err := cluster.CreatePool("new_pool")
 
-Or use command-line args as configuration:
+		// deletes a pool
+		err := cluster.DeletePool("new_pool")
 
-		cluster, err := rados.new(Connection).UseConfigArgs().Connect()
+		// manage a pool
+		pool, err := cluster.CreatePool("new_pool")
 
-Or an environment variable as configuration:
+		// stop managing the pool
+		pool.Close()
 
-		cluster, err := rados.new(Connection).UseConfigEnv("NAME_OF_ENV_VAR").Connect()
+Basic object operations:
 
-Or a map[string]string containing the connection configuration:
+		// manage an object
+		object := pool.ManageObject("object_name")
 
-		cluster, err := rados.new(Connection).UseConfigMap(configMap).Connect()
+		// write to object
+		err := object.WriteFull(my_data_reader)
 
-We can also connect to a cluster with a given user (omit the "client." prefix):
+		// read from an object
+		reader, err := object.Read(lengthToRead, offset)
 
-		cluster, err := rados.new(Connection).As("admin").Connect()
+		// remove an object
+		err := object.Remove()
 
-Or connect with a given cluster name and user (fully qualified user name):
+Async object operations:
 
-		cluster, err := rados.new(Connection).To("ceph").As("client.admin").Connect()
+		// manage object asynchronously
+		asyncObject := pool.ManageObject("my_object").AsyncMode(completeCallback, safeCallback, errCallback, "arg1", "arg2")
 
-We can mix and match these configuration as we need:
+		// async write
+		asyncObject.WriteFull(my_data_reader)
 
-		cluster, err := rados.new(Connection).To("ceph").As("client.admin").UseConfigFile("/etc/ceph/myceph.conf").Connect()
+		// async read. result will be stored in args.
+		asyncObject.Read(10, 0)
 
-Once the *Cluster#Connect function has been called, it will return a *Cluster instance. We can then communicate with
-the cluster using it.
+		// async remove.
+		asyncObjet.Remove()
+
+Other features implemented are:
+ - pool snapshots
+ - managed-snapshots
+ - read/write transactions
+ - object extended attributes
+
+Missing implementation:
+ - OMAP/TMAP operations (TODO)
+ - class executions (TODO)
+ - mon/osd/pg commands (necessary?)
+ - watch/unwatch/notify objects (still looking for a way to do this)
 */
 package grados

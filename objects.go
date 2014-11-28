@@ -42,17 +42,25 @@ func (pool *Pool) LastObjectVersion() uint64 {
 	return uint64(C.rados_get_last_version(pool.context))
 }
 
+// Object represents an object. The object may or may not be stored yet. This allows for atomic CRUD oerations to the
+// object represented. Use ManageObject to create a valid instance.
 type Object struct {
 	ioContext   C.rados_ioctx_t
 	name        string
 	watchHandle C.uint64_t
 }
 
+// ManageObject manages an object. This can read/write/update/delete objects.
 func (pool *Pool) ManageObject(name string) *Object {
 	return &Object{
 		ioContext: pool.context,
 		name:      name,
 	}
+}
+
+// Name returns the name or id of the object.
+func (o *Object) Name() string {
+	return o.name
 }
 
 // Write writes the data at a specific offset to the object.
@@ -155,11 +163,14 @@ func (o *Object) Clone(target *Object, srcOffset, dstOffset, length uint64) erro
 	return nil
 }
 
+// ObjectStatus represents the status of the object. Documentation on this is a big vague so this may or may not be very
+// accurate.
 type ObjectStatus struct {
 	size         uint64
 	modifiedTime time.Time
 }
 
+// Status returns the status of an object.
 func (o *Object) Status() (*ObjectStatus, error) {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -178,6 +189,8 @@ func (o *Object) Status() (*ObjectStatus, error) {
 	}, nil
 }
 
+// SetAllocationHint sets the expected object size and expected write size of an object. As per latest doc, this may not
+// actually do anything.
 func (o *Object) SetAllocationHint(expectedObjectSize, expectedWriteSize uint64) {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -186,7 +199,8 @@ func (o *Object) SetAllocationHint(expectedObjectSize, expectedWriteSize uint64)
 	C.rados_set_alloc_hint(o.ioContext, oid, es, ews)
 }
 
-// TODO: add lock duration
+// LockExclusive exclusively locks an object. At the moment, lock duration cannot be specified so this locks the object
+// indefinitely.
 func (o *Object) LockExclusive(name, cookie, description string, flags ...LibradosLock) error {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -218,7 +232,8 @@ func (o *Object) LockExclusive(name, cookie, description string, flags ...Librad
 	return nil
 }
 
-// TODO: add lock duration
+// LockShared share locks an object. At the moment, lock duration cannot be specified so this locks the object
+// indefinitely.
 func (o *Object) LockShared(name, cookie, tag, description string, flags ...LibradosLock) error {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -254,6 +269,7 @@ func (o *Object) LockShared(name, cookie, tag, description string, flags ...Libr
 	return nil
 }
 
+// Unlock unlocks a locked object. This returns an error if the lock is not owned by the current client.
 func (o *Object) Unlock(name, cookie string) error {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -273,6 +289,7 @@ func (o *Object) Unlock(name, cookie string) error {
 	return nil
 }
 
+// BreakLock forcefully breaks the object lock. This fails if specified client does not hold the lock.
 func (o *Object) BreakLock(name, client, cookie string) error {
 	oid := C.CString(o.name)
 	defer freeString(oid)
@@ -300,12 +317,14 @@ func (o *Object) BreakLock(name, client, cookie string) error {
 	return nil
 }
 
+// Locker represents a client that has locked an object.
 type Locker struct {
-	Client  string
-	Cookies string
-	Address string
+	Client  string // The client.
+	Cookies string // The cookies.
+	Address string // The address.
 }
 
+// ListLockers show all the clients that has locks on the object. This also returns the lock tag if any.
 func (o *Object) ListLockers(name string) ([]*Locker, string, error) {
 	oid := C.CString(o.name)
 	defer freeString(oid)

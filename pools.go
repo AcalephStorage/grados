@@ -50,12 +50,8 @@ type Pool struct {
 	context C.rados_ioctx_t
 }
 
-func (pool *Pool) GetContext() C.rados_ioctx_t {
-	return pool.context
-}
-
-// OpenPool opens a pool for query, read, and write operations.
-func (cluster *Cluster) OpenPool(poolName string) (*Pool, error) {
+// ManagePool opens a pool for query, read, and write operations.
+func (cluster *Cluster) ManagePool(poolName string) (*Pool, error) {
 	p := C.CString(poolName)
 	defer freeString(p)
 	var ioContext C.rados_ioctx_t
@@ -68,13 +64,13 @@ func (cluster *Cluster) OpenPool(poolName string) (*Pool, error) {
 }
 
 // CloseWhenDone this pool context when all asynchronous writes are done.
-func (pool *Pool) CloseWhenDone() {
+func (pool *Pool) SafeClose() {
 	C.rados_aio_flush(pool.context)
-	pool.CloseNow()
+	pool.Close()
 }
 
 // CloseNow this pool context immediately.
-func (pool *Pool) CloseNow() {
+func (pool *Pool) Close() {
 	C.rados_ioctx_destroy(pool.context)
 }
 
