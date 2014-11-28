@@ -33,3 +33,18 @@ func bufToReader(buf *C.char, bufLen C.int) io.Reader {
 func freeString(str *C.char) {
 	C.free(unsafe.Pointer(str))
 }
+
+func bufToStringSlice(bufAddr *C.char, ret C.int) []string {
+	reader := bufToReader(bufAddr, ret)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(reader)
+
+	result := make([]string, 0)
+	tmp := bytes.SplitAfter(buf.Bytes()[:ret-1], []byte{0})
+	for _, s := range tmp {
+		if len(s) > 0 {
+			result = append(result, string(s))
+		}
+	}
+	return result
+}

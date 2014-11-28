@@ -7,7 +7,6 @@ package grados
 import "C"
 
 import (
-	"bytes"
 	"io"
 	"time"
 )
@@ -52,25 +51,16 @@ func (wo *WriteOperation) AssertExists() *WriteOperation {
 func (wo *WriteOperation) CompareAttribute(attributeName string, operator CompareAttribute, value io.Reader) *WriteOperation {
 	name := C.CString(attributeName)
 	defer freeString(name)
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(value)
-
-	bufAddr := (*C.char)(unsafe.Pointer(&buf.Bytes()[0]))
-
-	C.rados_write_op_cmpxattr(wo.opContext, name, C.uint8_t(operator), bufAddr, C.size_t(buf.Len()))
+	bufAddr, bufLen := readerToBuf(value)
+	C.rados_write_op_cmpxattr(wo.opContext, name, C.uint8_t(operator), bufAddr, C.size_t(bufLen))
 	return wo
 }
 
 func (wo *WriteOperation) SetAttribute(name string, value io.Reader) *WriteOperation {
 	n := C.CString(name)
 	defer freeString(n)
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(value)
-	bufAddr := (*C.char)(unsafe.Pointer(&buf.Bytes()[0]))
-
-	C.rados_write_op_setxattr(wo.opContext, n, bufAddr, C.size_t(buf.Len()))
+	bufAddr, bufLen := readerToBuf(value)
+	C.rados_write_op_setxattr(wo.opContext, n, bufAddr, C.size_t(bufLen))
 	return wo
 }
 
@@ -123,7 +113,7 @@ func (wo *WriteOperation) Zero(offset, length uint64) *WriteOperation {
 }
 
 func (wo *WriteOperation) Operate(object *Object, modifiedTime *time.Time, flags ...LibradosOperation) error {
-	oid := C.CString(object.Name)
+	oid := C.CString(object.name)
 	defer freeString(oid)
 
 	var mtime C.time_t

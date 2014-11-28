@@ -7,7 +7,6 @@ package grados
 import "C"
 
 import (
-	"bytes"
 	"fmt"
 	"syscall"
 )
@@ -49,6 +48,10 @@ func (ps *PoolStatus) String() string {
 // Pool represents a pool io context. This contains pool related functions.
 type Pool struct {
 	context C.rados_ioctx_t
+}
+
+func (pool *Pool) GetContext() C.rados_ioctx_t {
+	return pool.context
 }
 
 // OpenPool opens a pool for query, read, and write operations.
@@ -169,7 +172,6 @@ func (pool *Pool) RequiredAlignment() uint64 {
 // ListPools returns all the pools in the ceph cluster.
 func (cluster *Cluster) ListPools() ([]string, error) {
 	bufLen := 4096
-	pools := make([]string, 0)
 	for {
 		bufAddr := bufferAddress(bufLen)
 		ret := C.rados_pool_list(cluster.handle, bufAddr, C.size_t(bufLen))
@@ -184,17 +186,7 @@ func (cluster *Cluster) ListPools() ([]string, error) {
 			continue
 		}
 
-		reader := bufToReader(bufAddr, ret)
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(reader)
-
-		tmp := bytes.SplitAfter(buf.Bytes()[:ret-1], []byte{0})
-		for _, s := range tmp {
-			if len(s) > 0 {
-				pools = append(pools, string(s))
-			}
-		}
-
+		pools := bufToStringSlice(bufAddr, ret)
 		return pools, nil
 	}
 }

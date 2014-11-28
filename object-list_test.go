@@ -27,7 +27,7 @@ func TestIterateObjects(t *testing.T) {
 	objectList, err := pool.OpenObjectList()
 	for i := 0; i < 3; i++ {
 		object, locationKey, err := objectList.Next()
-		t.Logf("%s:%s", object.Name, locationKey)
+		t.Logf("%s:%s", object.name, locationKey)
 		if err != nil {
 			t.Error("error: ", err)
 		}

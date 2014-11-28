@@ -16,12 +16,12 @@ type AttributeList struct {
 }
 
 func (o *Object) OpenAttributeList() (*AttributeList, error) {
-	oid := C.CString(o.Name)
+	oid := C.CString(o.name)
 	defer freeString(oid)
 	var iterator C.rados_xattrs_iter_t
 	ret := C.rados_getxattrs(o.ioContext, oid, &iterator)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to retrieve attributes of object %s", o.Name)
+		err.Message = fmt.Sprintf("Unable to retrieve attributes of object %s", o.name)
 		return nil, err
 	}
 	al := &AttributeList{
@@ -54,7 +54,7 @@ func (i *AttributeList) Close() {
 }
 
 func (o *Object) Attribute(attributeName string) (io.Reader, error) {
-	object := C.CString(o.Name)
+	object := C.CString(o.name)
 	attribute := C.CString(attributeName)
 	defer freeString(object)
 	defer freeString(attribute)
@@ -64,7 +64,7 @@ func (o *Object) Attribute(attributeName string) (io.Reader, error) {
 
 	ret := C.rados_getxattr(o.ioContext, object, attribute, bufAddr, C.size_t(bufLen))
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to get attribute %s of object %s.", attributeName, o.Name)
+		err.Message = fmt.Sprintf("Unable to get attribute %s of object %s.", attributeName, o.name)
 		return nil, err
 	}
 	attribbuf := bufToReader(bufAddr, ret)
@@ -72,7 +72,7 @@ func (o *Object) Attribute(attributeName string) (io.Reader, error) {
 }
 
 func (o *Object) SetAttribute(attributeName string, attributeValue io.Reader) error {
-	object := C.CString(o.Name)
+	object := C.CString(o.name)
 	attribute := C.CString(attributeName)
 	defer freeString(object)
 	defer freeString(attribute)
@@ -81,21 +81,21 @@ func (o *Object) SetAttribute(attributeName string, attributeValue io.Reader) er
 
 	ret := C.rados_setxattr(o.ioContext, object, attribute, bufAddr, bufLen)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to set attribute %s of object %s.", attributeName, o.Name)
+		err.Message = fmt.Sprintf("Unable to set attribute %s of object %s.", attributeName, o.name)
 		return err
 	}
 	return nil
 }
 
 func (o *Object) RemoveAttribute(attributeName string) error {
-	object := C.CString(o.Name)
+	object := C.CString(o.name)
 	attribute := C.CString(attributeName)
 	defer freeString(object)
 	defer freeString(attribute)
 
 	ret := C.rados_rmxattr(o.ioContext, object, attribute)
 	if err := toRadosError(ret); err != nil {
-		err.Message = fmt.Sprintf("Unable to get attribute %s of object %s.", attributeName, o.Name)
+		err.Message = fmt.Sprintf("Unable to get attribute %s of object %s.", attributeName, o.name)
 		return err
 	}
 	return nil

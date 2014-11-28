@@ -49,7 +49,7 @@ func (ol *ObjectList) Next() (object *Object, locationKey string, err error) {
 	} else {
 		object = &Object{
 			ioContext: ol.ioContext,
-			Name:      C.GoString(e),
+			name:      C.GoString(e),
 		}
 		locationKey = C.GoString(k)
 	}
